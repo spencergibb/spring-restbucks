@@ -123,7 +123,7 @@
           "datasource": "Prometheus",
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(order_line_item_added_total[$__rate_interval])) by (name, milk, size)",
+          "expr": "sum(rate(OrderLineItemCreated_total[$__rate_interval])) by (name, milk, size)",
           "legendFormat": "{{name}} {{milk}} {{size}}",
           "range": true,
           "refId": "A"
@@ -215,7 +215,7 @@
           "datasource": "Prometheus",
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(order_line_item_total[$__rate_interval])) by (name, milk, size)",
+          "expr": "sum(rate(OrderInPreparation_total[$__rate_interval])) by (name, milk, size)",
           "legendFormat": "{{name}} {{milk}} {{size}}",
           "range": true,
           "refId": "A"
@@ -307,7 +307,7 @@
           "datasource": "Prometheus",
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(order_make_total[$__rate_interval])) by (location)",
+          "expr": "sum(rate(OrderCreated_total[$__rate_interval])) by (location)",
           "legendFormat": "{{location}}",
           "range": true,
           "refId": "A"
@@ -399,7 +399,7 @@
           "datasource": "Prometheus",
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(order_taken_total[$__rate_interval]))",
+          "expr": "sum(rate(OrderTaken_total[$__rate_interval]))",
           "legendFormat": "{{name}} {{milk}} {{size}}",
           "range": true,
           "refId": "A"
@@ -491,7 +491,7 @@
           "datasource": "Prometheus",
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(order_prepared_total[$__rate_interval]))",
+          "expr": "sum(rate(OrderPrepared_total[$__rate_interval]))",
           "legendFormat": "{{name}} {{milk}} {{size}}",
           "range": true,
           "refId": "A"
