@@ -15,20 +15,20 @@
  */
 package org.springsource.restbucks.engine;
 
+import lombok.AllArgsConstructor;
+import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
-import lombok.AllArgsConstructor;
-import lombok.NonNull;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.stereotype.Service;
 import org.springsource.restbucks.order.Order;
 import org.springsource.restbucks.order.Order.OrderPaid;
 import org.springsource.restbucks.order.Orders;
-
-import org.springframework.modulith.events.ApplicationModuleListener;
-import org.springframework.stereotype.Service;
 
 /**
  * Simple {@link OrderPaid} listener marking the according {@link Order} as in process, sleeping for 5 seconds and
@@ -52,7 +52,9 @@ class Engine {
 	public void handleOrderPaidEvent(OrderPaid event) {
 
 		if (settings.isFailRandomly()) {
+
 			int i = RANDOM.nextInt(0, 9);
+
 			if (i < 3) {
 				throw new IllegalStateException("Simulates random failure");
 			}

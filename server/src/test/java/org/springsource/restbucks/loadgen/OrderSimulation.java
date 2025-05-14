@@ -4,7 +4,9 @@ import static io.gatling.http.HeaderValues.*;
 import static io.gatling.javaapi.core.CoreDsl.*;
 import static io.gatling.javaapi.http.HttpDsl.*;
 
+import io.gatling.app.Gatling;
 import io.gatling.javaapi.core.ScenarioBuilder;
+import io.gatling.javaapi.core.Session;
 import io.gatling.javaapi.core.Simulation;
 import io.gatling.javaapi.http.HttpProtocolBuilder;
 
@@ -14,7 +16,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.hateoas.IanaLinkRelations;
 import org.springframework.hateoas.Link;
 import org.springframework.hateoas.mediatype.hal.HalLinkDiscoverer;
-import org.springsource.restbucks.drinks.DrinksOptions;
 import org.springsource.restbucks.payment.CreditCardNumber;
 import org.springsource.restbucks.payment.web.PaymentLinks;
 
@@ -22,11 +23,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class OrderSimulation extends Simulation {
 
-	private static final Duration DURATION = Duration.ofMinutes(120);
+	private static final Duration DURATION = Duration.ofMinutes(30);
 	private static final HalLinkDiscoverer LINKS = new HalLinkDiscoverer();
 	private static final CreditCardNumber CCN = CreditCardNumber.of("1234123412341234");
 
-	private static final int USERS_AT_ONCE = 2;
+	private static final int USERS_AT_ONCE = 15;
 	private static final ObjectMapper objectMapper = new ObjectMapper();
 
 	// HTTP configuration
@@ -35,50 +36,45 @@ public class OrderSimulation extends Simulation {
 			.acceptHeader(ApplicationJson())
 			.contentTypeHeader(ApplicationJson());
 
-	// Scenario to make requests to /drinks and /orders
-	ScenarioBuilder scn = scenario("Drinks Order Scenario").exec(
+	ScenarioBuilder scn = scenario("Place Orders Scenario")
 
-			http("Get Drinks List")
-					.get("/drinks")
-					.check(bodyString().saveAs("drinksResponse")))
+			.exec(
+					http("Get Drinks List")
+							.get("/drinks")
+							.check(bodyString().saveAs("drinksResponse")) //
+			)
 
 			.exec(session -> {
 
 				var response = session.getString("drinksResponse");
 				var urls = LINKS.recursive()
-						.findLinksWithRel(DrinksOptions.DRINKS_REL, response)
+						.findLinksWithRel("restbucks:drink", response)
 						.stream().map(Link::getHref).toList();
 
 				// Save the list of drink links to session
 				return session.set("drinkLinks", urls);
-
 			})
-			.asLongAs(session -> !session.getList("drinkLinks").isEmpty())
-			.on(exec(session -> {
+
+			.exec(session -> {
 
 				var drinkLinks = session.getList("drinkLinks");
 
-				// Randomly select a drink
-				var drink = drinkLinks.get(ThreadLocalRandom.current().nextInt(drinkLinks.size()));
+				var random = ThreadLocalRandom.current();
+				var drinks = drinkLinks.get(random.nextInt(drinkLinks.size()));
+				var location = random.nextBoolean() ? "To go" : "In store";
 
-				// Randomize location
-				var location = ThreadLocalRandom.current().nextBoolean() ? "To go" : "In store";
+				return session
+						.set("orderRequestBody", "{ \"drinks\" : [\"%s\"], \"location\" : \"%s\" }".formatted(drinks, location));
 
-				// Create order request body
-				var orderRequestBody = String.format("{ \"drinks\" : [\"%s\"], \"location\" : \"%s\" }", drink, location);
-
-				// Save the request body to session
-				return session.set("orderRequestBody", orderRequestBody);
-
-			}).exec(
-
+			})
+			.exec(
 					http("Create Order")
-							.post("/orders") //
-							.body(StringBody(session -> session.getString("orderRequestBody"))).asJson() //
-							.check(status().in(200, 201)) // Expecting valid status or errors
-							.check(bodyString().saveAs("orderResponse")) // Save order response to session
-
-			).exec(session -> {
+							.post("/orders")
+							.body(StringBody(it -> it.getString("orderRequestBody"))).asJson()
+							.check(status().in(201))
+							.check(bodyString().saveAs("orderResponse")) //
+			)
+			.exec(session -> {
 
 				// Extract the order ID from the order response
 				var response = session.getString("orderResponse");
@@ -86,46 +82,48 @@ public class OrderSimulation extends Simulation {
 				var self = LINKS.findRequiredLinkWithRel(IanaLinkRelations.SELF, response);
 
 				return session
-						.set("payment", payment.map(Link::getHref).orElse(null)) //
-						.set("order", self.getHref()); //
-
-			}).exec(session -> {
-
-				// Save the payment request body to session
-				return session.set("paymentRequestBody", String.format("{\"number\":\"%s\"}", CCN));
+						.set("payment", payment.map(Link::getHref).orElse(null))
+						.set("order", self.getHref())
+						.set("paymentRequestBody", "{\"number\":\"%s\"}".formatted(CCN));
 
 			}).exec(
 
-					http("Submit Payment") //
-							.put(session -> session.get("payment")) //
-							.body(StringBody(session -> session.getString("paymentRequestBody"))).asJson() //
-							.check(bodyString().saveAs("paymentResponse")) //
-							.check(status().in(200, 201)) // Expecting valid status
+					http("Submit Payment")
+							.put(session -> session.get("payment"))
+							.body(StringBody(session -> session.getString("paymentRequestBody"))).asJson()
+							.check(bodyString().saveAs("paymentResponse"))
+							.check(status().in(201)) //
+			)
+			.asLongAs(this::orderIsNotReady)
+			.on(
+					exec(
+							http("Get Order")
+									.get(it -> it.get("order"))
+									.check(bodyString().saveAs("orderResponse"))
+									.check(status().in(200, 304))
 
-			).asLongAs(session -> session.getString("receipt") == null && !"Taken".equals(session.getString("orderStatus")))
-					.on(pause(1) //
-							.exec(
+					).exec(session -> {
 
-									http("Get Order") //
-											.get(session -> session.get("order")) //
-											.check(bodyString().saveAs("orderResponse")) // Save order response to session
-											.check(status().in(200, 201, 404))// Expecting valid status
+						var orderResponse = session.getString("orderResponse");
+						var receiptLink = LINKS.findLinkWithRel(PaymentLinks.RECEIPT_REL, orderResponse);
 
-							).exec(session -> {
+						return session
+								.set("receipt", receiptLink.map(Link::getHref).orElse(null))
+								.set("orderStatus", readOrder(orderResponse));
 
-								var orderResponse = session.getString("orderResponse"); //
-								var receiptLink = LINKS.findLinkWithRel(PaymentLinks.RECEIPT_REL, orderResponse);
+					}).pause(Duration.ofSeconds(1)))
+			.exec(
 
-								return session
-										.set("receipt", receiptLink.map(Link::getHref).orElse(null))
-										.set("orderStatus", readOrder(orderResponse));
-							}))
-					.exec(
+					http("Take Order") //
+							.delete(it -> it.get("receipt")) //
+							.check(status().in(200)) //
+			);
 
-							http("Take Order") //
-									.delete(session -> session.get("receipt")) //
-									.check(status().in(200, 201, 404, 500)) //
-					));
+	private boolean orderIsNotReady(Session session) {
+
+		return session.getString("receipt") == null
+				&& !"Ready".equals(session.getString("orderStatus"));
+	}
 
 	private String readOrder(String orderResponse) {
 
@@ -150,5 +148,14 @@ public class OrderSimulation extends Simulation {
 
 	{
 		setUp(scn.injectOpen(constantUsersPerSec(USERS_AT_ONCE).during(DURATION))).protocols(httpProtocol);
+		// setUp(scn.injectOpen(atOnceUsers(USERS_AT_ONCE))).protocols(httpProtocol);
+	}
+
+	public static void main(String[] args) {
+
+		Gatling.main(new String[] {
+				"-s", OrderSimulation.class.getName(),
+				"-rf", "target/gatling-results"
+		});
 	}
 }

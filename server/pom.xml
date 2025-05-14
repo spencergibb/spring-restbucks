@@ -22,8 +22,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
 		<jmolecules.version>2025.0.0-SNAPSHOT</jmolecules.version>
 		<spring-hateoas.version>2.5.0-SNAPSHOT</spring-hateoas.version>
 		<spring-modulith.version>1.4.0-SNAPSHOT</spring-modulith.version>
-		<gatling-charts-highcharts.version>3.12.0</gatling-charts-highcharts.version>
-		<gatling-maven-plugin.version>4.10.2</gatling-maven-plugin.version>
+		<gatling-charts-highcharts.version>3.13.5</gatling-charts-highcharts.version>
+		<gatling-maven-plugin.version>4.16.3</gatling-maven-plugin.version>
 	</properties>
 
 	<dependencyManagement>
@@ -224,11 +224,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
 			</activation>
 
 			<dependencies>
-				<dependency>
-					<groupId>org.springframework.boot</groupId>
-					<artifactId>spring-boot-devtools</artifactId>
-					<optional>true</optional>
-				</dependency>
+<!--				<dependency>-->
+<!--					<groupId>org.springframework.boot</groupId>-->
+<!--					<artifactId>spring-boot-devtools</artifactId>-->
+<!--					<optional>true</optional>-->
+<!--				</dependency>-->
 			</dependencies>
 
 		</profile>
