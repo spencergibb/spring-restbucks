@@ -29,6 +29,7 @@
     <properties>
         <java.version>21</java.version>
         <jmolecules.version>2025.0.0-SNAPSHOT</jmolecules.version>
+        <bytebuddy.version>1.17.5</bytebuddy.version>
     </properties>
 
     <dependencyManagement>
@@ -128,6 +129,23 @@
 
     <build>
         <plugins>
+
+            <plugin>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy-maven-plugin</artifactId>
+                <version>${bytebuddy.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>transform-extended</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <classPathDiscovery>true</classPathDiscovery>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
